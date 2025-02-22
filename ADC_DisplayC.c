@@ -1,25 +1,17 @@
-/*
-  ATIVIDADE EMBARCATECH - TAREFA AULA SÍNCRONA 10/02
-  Aluno: Devid Henrique Pereira dos Santos
-  Matrícula: TIC370100380
-*/
-
-// Bibliotecas
-//#include <stdio.h>        // Biblioteca
-//#include <stdlib.h>         // Biblioteca
+#include <stdio.h>     
+#include <stdlib.h>           
 #include "pico/stdlib.h"    // Biblioteca padrão pio SDK
 #include "hardware/adc.h"   // Biblioteca para conversor analógico-digital
 #include "hardware/i2c.h"   // Biblioteca para habilitar o I2C
-#include "lib/ssd1306.h"    // BIblioteca para configuração do display OLED
-//#include "pico/bootrom.h" // Biblioteca
+#include "bibli/ssd1306.h"  // BIblioteca para configuração do display OLED
 #include "hardware/pwm.h"   // Biblioteca do PWM
 #include "hardware/timer.h" // Biblioteca para funções de temporização e contagem de tempo
 
-// Define os pinos display
-#define I2C_PORT i2c1      //
-#define I2C_SDA 14         //
-#define I2C_SCL 15         // 
-#define endereco 0x3C      //
+// Define os pinos do display
+#define I2C_PORT i2c1      
+#define I2C_SDA 14         
+#define I2C_SCL 15         
+#define endereco 0x3C      
 
 // Define os pinos do Joystick
 #define JOYSTICK_X_PIN 26  // GPIO para eixo X
@@ -39,6 +31,8 @@
 // Variáveis globais
 static volatile uint a = 1;
 static volatile uint32_t last_time = 0; // Armazena o tempo do último evento (em microssegundos)
+static volatile bool led_verde_estado = false; // Estado do LED Verde
+static volatile uint8_t estilo_borda = 0; // Alternância de borda
 
 bool cor = true;
 
@@ -47,7 +41,7 @@ ssd1306_t ssd; // Inicializa a estrutura do display
 // Função para configurar o display
 void setup_display(){
 
-  // I2C Initialisation. Using it at 400Khz.
+  // I2C Inicialização usando 400Khz.
   i2c_init(I2C_PORT, 400 * 1000);
 
   gpio_set_function(I2C_SDA, GPIO_FUNC_I2C); // Set the GPIO pin function to I2C
@@ -73,15 +67,18 @@ void gpio_irq_handler(uint gpio, uint32_t events)
     if (current_time - last_time > 200000) // 200 ms de debouncing
     {
         last_time = current_time; // Atualiza o tempo do último evento
-    }
 
-    if(gpio_get(BOT_A)==0){
-      gpio_put(LED_G, !gpio_get(LED_G));
-    }
-    
-    else if(gpio_get(JOYSTICK_PB)==0){
-      gpio_put(LED_B, !gpio_get(LED_B));
-      gpio_put(LED_B, !gpio_get(LED_B));  
+        if (gpio == BOT_A) {
+            gpio_put(LED_G, !gpio_get(LED_G));
+        }
+        else if (gpio == JOYSTICK_PB) {
+            // Alterna o estado do LED Verde
+            led_verde_estado = !led_verde_estado;
+            gpio_put(LED_G, led_verde_estado);
+
+            // Alterna o estilo da borda do display
+            estilo_borda = (estilo_borda + 1) % 3;
+        }
     }
 }
 
@@ -140,46 +137,48 @@ int main()
   setup_pwm();
   
   // Configura o adc do joystick
-  adc_init();                       // Inicializa o adc
-  adc_gpio_init(JOYSTICK_X_PIN);    // adc do joystick eixo x
-  adc_gpio_init(JOYSTICK_Y_PIN);    // adc o joystick eixo y 
+  adc_init();                       
+  adc_gpio_init(JOYSTICK_X_PIN);    
+  adc_gpio_init(JOYSTICK_Y_PIN);    
   
   // Configura a função de interrupção
   gpio_set_irq_enabled_with_callback(BOT_A, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
   gpio_set_irq_enabled_with_callback(JOYSTICK_PB, GPIO_IRQ_EDGE_FALL, true, &gpio_irq_handler);
 
   uint16_t centro = 2048;
-  uint16_t margem = 50; // Margem de ±50 para considerar a região central
+  uint16_t margem = 50; 
 
   while (true)
   {
-     
-    adc_select_input(0);        // Seleciona o ADC para eixo X. O pino 26 como entrada analógica
-    uint16_t adc_value_x = adc_read();   // Variável para guardar o valor do adc do eixo X
-    adc_select_input(1);        // Seleciona o ADC para eixo Y. O pino 27 como entrada analógica
-    uint16_t adc_value_y = adc_read();   // Variável para guardar o valor do adc do eixo y   
+    adc_select_input(0);        
+    uint16_t adc_value_x = adc_read();   
+    adc_select_input(1);        
+    uint16_t adc_value_y = adc_read();   
     
-    uint8_t valor_x = adc_value_x/22; // Converte o valor do adc em um inteiro de 8 bits na resolução do display
-    uint8_t valor_y = adc_value_y/36; // Converte o valor do adc em um inteiro de 8 bits na resolução do display
+    uint8_t valor_x = adc_value_x / 22;
+    uint8_t valor_y = adc_value_y / 36;
 
-    // Verifica se os valores do ADC estão na região central
     if (abs(adc_value_x - centro) <= margem && abs(adc_value_y - centro) <= margem)
     {
-        // Apaga os LEDs
-        pwm_set_gpio_level(LED_R, 0); // Desliga o LED vermelho apagado
-        pwm_set_gpio_level(LED_B, 0); // Desliga o LED azul apagado
+        pwm_set_gpio_level(LED_R, 0);
+        pwm_set_gpio_level(LED_B, 0);
     }
     else
     {
-        // Ajusta o brilho dos LEDs com base nos valores do ADC
-        pwm_set_gpio_level(LED_R, adc_value_x); // Varia o brilho do LED vermelho proporcional ao adc do eixo x
-        pwm_set_gpio_level(LED_B, adc_value_y); // Varia o brilho do LED azul proporcional ao adc do eixo Y
+        pwm_set_gpio_level(LED_R, adc_value_x);
+        pwm_set_gpio_level(LED_B, adc_value_y);
     }
 
-    ssd1306_fill(&ssd, !cor); // Limpa o display  
-    ssd1306_rect(&ssd, valor_x, valor_y, 8, 8, cor, !cor); // Desenha o quadrado de 8x8       
-    ssd1306_send_data(&ssd); // Atualiza o display
-    
+    ssd1306_fill(&ssd, !cor);
+
+    switch (estilo_borda) {
+        case 0: ssd1306_rect(&ssd, 0, 0, WIDTH, HEIGHT, true, false); break;
+        case 1: ssd1306_rect(&ssd, 2, 2, WIDTH - 4, HEIGHT - 4, true, false); break;
+        case 2: ssd1306_rect(&ssd, 4, 4, WIDTH - 8, HEIGHT - 8, true, false); break;
+    }
+
+    ssd1306_rect(&ssd, valor_x, valor_y, 8, 8, cor, !cor);
+    ssd1306_send_data(&ssd);
   }
 
   return 0;
