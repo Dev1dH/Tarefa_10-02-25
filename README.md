@@ -11,4 +11,4 @@ Com o emprego do conversor analógico-digital (ADC), o movimento do joystick é 
 5. Display OLED: exibe um quadrado 8x8 que pode ser manipulado pelo joystick, além de exibir diferentes bordas
 
 ## Links da demonstração
-Vídeo da BitDogLab: 
+Vídeo da BitDogLab: https://www.youtube.com/watch?v=F_KQo_ibsBE
